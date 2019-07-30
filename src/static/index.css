@@ -1,9 +1,14 @@
+table{
+  width: 100%;
+  text-align: center;
+}
 th, td{
   padding: 5px;
 }
+/* onClikc 이벤트과 같이 있으면 정상적인 작동인 안된다.
 tr:active{
   background: #ccc;
-}
+} */
 .page{
   position: fixed;
   top:0;
