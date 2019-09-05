@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <script>
+      const log = console.log;
+      const delay = (time, a) => new Promise(
+          resolve => setTimeout(() => resolve(a), time)
+      );
+
+      // ===== 아이포트 데이터
+      const Impt = {
+        // 아이포트 결제 데이터
+        payments: {
+          0: [{iid: 11, oid: 1}, {iid: 12, oid: 2}, {iid: 13, oid: 3}],
+          1: [{iid: 14, oid: 4}, {iid: 15, oid: 5}, {iid: 16, oid: 6}],
+          2: [{iid: 17, oid: 7}, {iid: 18, oid: 8}],
+          3: [],
+          4: [],
+          //...
+        },
+        // 아이포트에서 제공해 주는 함수.
+        // 결제 데이터 가져오기.
+        getPayments: page => {
+          console.log(`http://..?page=${page}`);
+          return delay(100, Impt.payments[page])
+        },
+        // 결제 취소
+        cancelpayment: paymentId => Promise.resolve(`${paymentId}: 취소완료`)
+      };
+
+      // ===== 주문내역 가져오기.
+      const getOrders = ids => delay(100, [{id: 1}, {id:3}, {id: 7}]);
+
+      function job(){
+
+      }
+
+      job();
+
+    </script>
+  </head>
+  <body>
+    test
+  </body>
+</html>
