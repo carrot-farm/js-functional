@@ -35,7 +35,6 @@ for(const a of str){
  *  - 이터레이터: `{ value, done }` 객체를 리턴하는 `next()` 를 가진 값
  *  - 이터러블/이터레이터 프로토콜: 이터러블을 `for...of, 전개연산자` 등과 함께 동작하도록 규약
  ======================================= */
-
 // ===== Array
 log('Arr ---------------------');
 const arr = [1, 2, 3];
@@ -61,3 +60,57 @@ for(const a of map.values()){log(a)}; // 1 2 3 (값만 출력 가능 하다.)
 for(const a of map.entries()){log(a)}; //  (엔트리를 출력 가능 한다.)
 let mapIter = map.keys(); // MapIteraotr 객체를 리턴한다.
 log('> map.keys : ', mapIter.next()); // {value: "a", done: false}
+
+
+
+/** =======================================
+ *  사용자 정의 이터러블
+ * # 이터레이터를 직접 구현.
+ ======================================= */
+console.clear();
+// ===== 이터러블 프로토콜을 만족하는 객체
+const iterable = {
+  // # iterator 객체 정의
+  [Symbol.iterator](){
+    let i = 3; // 임의의 수
+    // # 반환할 iterator
+    return {
+      // # next 메소드 반환
+      next(){
+        return i=== 0 ? {done: true} : {value: i--, done: false}
+      },
+      // # 반환된 iterator 실행시 자기자신을 반환.(순회를 위해서 계속 자신을 반환)
+      [Symbol.iterator]() {
+        return this;
+      }
+    }
+  }
+};
+
+// ===== 이터레이터 반환
+let iterator = iterable[Symbol.iterator]();
+// log(iterator.next()); // {value: 3, done: false}
+// log(iterator.next()); // {value: 2, done: false}
+// log(iterator.next()); // {value: 1, done: false}
+// log(iterator.next()); // {done: true}
+for(const a of iterable) { log(a); }
+
+// const arr2 = [1, 2, 3];
+// let iter2 = arr2[Symbol.iterator]();
+// iter2.next();
+
+// ===== iterable 적용 예
+// # 배열이라서가 아니라 이터러블 프로토콜을
+for( const a of document.querySelectorAll('*')) { log(a); }
+const all = document.querySelectorAll('*');
+let iter3 = all[Symbol.iterator]();
+log(iter3.next()); // {value: html, done: false};
+
+
+/** =======================================
+ *  전개 연산자
+ * . iterable 프로토콜을 따른다.
+ ======================================= */
+ console.clear();
+ const a = [1, 2];
+ log([...a, ...[3, 4], ...set, ...map.keys()]); // [1, 2, 3, 4]
