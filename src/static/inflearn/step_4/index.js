@@ -40,7 +40,7 @@ log(
  ======================================= */
 clear();
 // ===== reduce를 이용해 값을 축약 해서 사용한다.
-const go = (...args) => reduce((a, f) => f(a), args)
+const go = (...args) => reduce((a, f) => f(a), args);
 
 
 // ===== 인자들을 통해서 하나의 값으로 축약

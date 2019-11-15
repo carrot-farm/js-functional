@@ -47,3 +47,11 @@ const reduce = curry((f, acc, iter ) => {
   }
   return acc; // 누적된 결과값을 리턴
 });
+
+
+// ===== reduce를 이용해 값을 축약 해서 보기좋게 변환.
+const go = (...args) => reduce((a, f) => f(a), args);
+
+// ===== 함수들을 축약해 하나의 함수로 만든다.
+const pipe = (f, ...fs) => (...as) => go(f(...as), ...fs);
+
