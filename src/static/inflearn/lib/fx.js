@@ -117,7 +117,10 @@ const range = l => {
  ======================================= */
 const take = curry((l, iter) => {
   let res = [];
-  for (const a of iter) {
+  iter = iter[Symbol.iterator]();
+  let cur;
+  while (!(cur = iter.next()).done) {
+    const a = cur.value
     res.push(a);
     if(res.length === l){return res;}
   }
@@ -170,7 +173,7 @@ L.filter = curry(function *(f, iter){
   while(!(cur = iter.next()).done){
     const a = cur.value;
     if(f(a)){
-      yield f(a);
+      yield a;
     }
   }
 });
