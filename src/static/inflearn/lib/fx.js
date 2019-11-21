@@ -47,47 +47,11 @@ const sum = curry((f, iter) => go(
 
 
 
-/** =======================================
- *  map
- * . iterable 프로토콜을 따르는 map 함수 정의
- * . 배열에 담을 값을 함수에 위임한다.
- ======================================= */
-const map = curry((f, iter) => {
-  let res = [];
-  iter = iter[Symbol.iterator]();
-  let cur;
-  while(!(cur = iter.next()).done){
-    const a = cur.value;
-    res.push(f(a))
-  }
-  // # 수정 전 코드
-  // for(const a of iter){
-  //   res.push(f(a)); // 인자로 받은 함수가 누적 값을 결정.
-  // }
-  return res;
-});
 
 
 
-/** =======================================
- *  filter
- * . iterable 프로토콜을 따르는 filter
- * . 필터링의 조건을 함수에 위임
- ======================================= */
-const filter = curry((f,iter) => {
-  let res = [];
-  iter = iter[Symbol.iterator]();
-  let cur;
-  while(!(cur = iter.next()).done){
-    const a = cur.value;
-    if(f(a)){res.push(a);}
-  }
-  // # 수정전 코드
-  // for(const a of iter){
-  //   if(f(a)){res.push(a);}
-  // }
-  return res;
-});
+
+
 
 
 
@@ -130,6 +94,27 @@ const take = curry((l, iter) => {
 
 
 /** =======================================
+ Array.prototype.join 보다 다형성이 높은 join
+ ======================================= */
+const join = curry((sep = ',', iter) =>
+   reduce((a, b) => `${a}${sep}${b}`, iter));
+
+
+
+/** =======================================
+ *  find
+ * . take를 이용해서 결론을 만드는 함수.
+ * . 조건에 해당하는 모든 값을 꺼내는 것이 아니라 처음 만난 하나의 값만 꺼냄
+======================================= */
+const find = curry((f, iter) => go(
+  iter,
+  filter(f),
+  take(1),
+  ([a]) => a));
+
+
+
+/** =======================================
  지연성
  ======================================= */
 const L = {};
@@ -155,25 +140,185 @@ L.range = function *(l) {
  *  L.map
  ======================================= */
 L.map = curry(function *(f, iter) {
-  iter = iter[Symbol.iterator]();
-  let cur;
-  while(!(cur = iter.next()).done){
-    const a = cur.value;
-    yield f(a);
+  for(const a of iter){
+    yield f(a)
   }
 });
+
+// # iterable 적용
+// L.map = curry(function *(f, iter) {
+//   iter = iter[Symbol.iterator]();
+//   let cur;
+//   while(!(cur = iter.next()).done){
+//     const a = cur.value;
+//     yield f(a);
+//   }
+// });
 
 
 /** =======================================
  *  L.filter
  ======================================= */
+// # iterable 적용
 L.filter = curry(function *(f, iter){
-  iter = iter[Symbol.iterator]();
-  let cur;
-  while(!(cur = iter.next()).done){
-    const a = cur.value;
-    if(f(a)){
+  for( const a of iter){
+    if(f(a)) { yield a; }
+  }
+});
+// # iterable 적용
+// L.filter = curry(function *(f, iter){
+//   iter = iter[Symbol.iterator]();
+//   let cur;
+//   while(!(cur = iter.next()).done){
+//     const a = cur.value;
+//     if(f(a)){
+//       yield a;
+//     }
+//   }
+// });
+
+
+
+/** =======================================
+ *  지연성을 가진 entries
+ * . { limit: 10, offset: 10, type: 'notice' }
+ * -> [["limit": 10], ["offset": 10], ["type": "notice"]]
+ ======================================= */
+ L.entries = function* (obj){
+   for(const k in obj){
+     yield [k, obj[k]];
+    }
+  };
+
+/** =======================================
+ *  take Infinity
+ ======================================= */
+const takeAll = take(Infinity);
+
+
+/** =======================================
+ *  map
+ * . iterable 프로토콜을 따르는 map 함수 정의
+ * . 배열에 담을 값을 함수에 위임한다.
+ ======================================= */
+// # L.map 적용 코드
+const map = curry(pipe(L.map, takeAll));
+
+// # iterable 적용 코드
+// const map = curry((f, iter) => {
+//   let res = [];
+//   iter = iter[Symbol.iterator]();
+//   let cur;
+//   while(!(cur = iter.next()).done){
+//     const a = cur.value;
+//     res.push(f(a))
+//   }
+//   // # 수정 전 코드
+//   // for(const a of iter){
+//   //   res.push(f(a)); // 인자로 받은 함수가 누적 값을 결정.
+//   // }
+//   return res;
+// });
+
+
+
+/** =======================================
+ *  filter
+ * . iterable 프로토콜을 따르는 filter
+ * . 필터링의 조건을 함수에 위임
+ ======================================= */
+// # L.filter 적용.
+const filter = curry(pipe(L.filter, takeAll));
+
+// # iterable 적용 코드
+// const filter = curry((f,iter) => {
+//   let res = [];
+//   iter = iter[Symbol.iterator]();
+//   let cur;
+//   while(!(cur = iter.next()).done){
+//     const a = cur.value;
+//     if(f(a)){res.push(a);}
+//   }
+//   // # 수정전 코드
+//   // for(const a of iter){
+//   //   if(f(a)){res.push(a);}
+//   // }
+//   return res;
+// });
+
+
+
+/** =======================================
+*  isIterable
+* . isIterable 객체인지 확인
+======================================= */
+const isIterable = a => a && a[Symbol.iterator];
+
+
+
+/** =======================================
+ *  L.flatten, faltten
+ * . 내부 배열을 펼처서 하나의 배열로 만드는 역활.
+ *   - eg) [...[1, 2], 3, 4, ...[5, 6], ...[7, 8, 9]]
+======================================= */
+clear();
+// # yield * 적용
+L.flatten = function *(iter) {
+  for (const a of iter){
+    if(isIterable(a)){ // 이터러블일 경우 한번더 들어간다.
+      yield *a; // 즉시 순회 후 평가
+    }else{
       yield a;
     }
   }
-});
+};
+// # 기본
+// L.flatten = function *(iter) {
+//   for (const a of iter){
+//     if(isIterable(a)){ // 이터러블일 경우 한번더 들어간다.
+//       for(const b of a){
+//         yield a;
+//       }
+//     }else{
+//       yield a;
+//     }
+//   }
+// };
+
+/** =======================================
+ *  flatten
+ * . 내부 배열을 펼처서 하나의 배열로 만드는 역활.
+======================================= */
+// # 즉시 평가 함수.
+const flatten = pipe(L.flatten, takeAll);
+
+
+
+
+/** =======================================
+ *  L.deepFlat
+ * . 깊은 iterable 을 모두 펼쳐준다.
+======================================= */
+L.deepFlat = function *f(iter){
+  for(const a of iter){
+    if(isIterable(a)) {
+      yield *f(a); // 재귀 호출
+    }else{
+      yield a;
+    }
+  }
+}
+
+
+
+
+/** =======================================
+ *  L.flatMap / flatMap
+ * . flatten과 map 동시 적용.
+ * . flatten과의 차이점은 함수를 이용해 변화를 줄 수 있다.
+======================================= */
+// ===== 지연 적인 flatmap
+L.flatMap = curry(pipe(L.map, L.flatten));
+
+// ===== 전체 평가
+const flatMap = pipe(L.map, flatten);
