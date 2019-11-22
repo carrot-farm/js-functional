@@ -6,25 +6,69 @@ const curry = f =>
     ? f(a, ..._) // 인자가 2개 이상이면 즉시 실행
     : (..._) => f(a, ..._); // 인자가 1개면 그동안의 인자를 모아서 함수를 리턴
 
+// ===== go 실행 시 첫 데이터가 Promise일 경우 처리를 위함.
+const go1 = (a, f) => a instanceof Promise ? a.then(f, ) : f(a);
+
+
+// ===== reduce 의 Promise 처리
+const reduceF = (acc, a, f) =>
+a instanceof Promise
+? a.then(a => f(acc, a), e => e === nop ? acc : Promise.reject(e)) // then() 의 2번재 인자로 nop 처리
+: f(acc, a);
+
+// ===== reduce 시 iterator의 첫번째 데이터만 뽑는 코드
+const head = iter => go1(take(1, iter), ([h]) => h);
 
 
 // ===== iterable 프로토콜을 따르는 reduce
-// # 누적되는 값을 함수에 위임한다.
+/** 누적되는 값을 함수에 위임한다. */
 const reduce = curry((f, acc, iter ) => {
-  // # 초기값이 없고 2개의 함수와 iter만 넘어 왔을 때 초기값 설정
+  // # 코드 정리
   if(!iter){
-    iter = acc[Symbol.iterator](); // 2번째가 iterator이니 iter를 iterator로 만든다.
-    acc = iter.next().value; // 첫번째를 실행 시키고 그 값을 초기값으로 삼는다.
-  } else {
-    iter = iter[Symbol.iterator]();
+    return reduce(f,  head(iter = acc[Symbol.iterator]()), iter);
   }
-  // # 누적
-  let cur;
-  while(!(cur = iter.next()).done){
-    const a = cur.value;
-    acc = f(acc, a); // 누적값을 함수에게 위임.
-  }
-  return acc; // 누적된 결과값을 리턴
+  iter = iter[Symbol.iterator]();
+  // # 초기값이 없고 2개의 함수와 iter만 넘어 왔을 때 초기값 설정
+  // if(!iter){
+  //   iter = acc[Symbol.iterator](); // 2번째가 iterator이니 iter를 iterator로 만든다.
+  //   acc = iter.next().value; // 첫번째를 실행 시키고 그 값을 초기값으로 삼는다.
+  // } else {
+  //   iter = iter[Symbol.iterator]();
+  // }
+
+  // # 누적(Symbol['nop'] 처리)
+  return go1(acc, function recur(acc){
+    let cur;
+    while(!(cur = iter.next()).done){
+      acc = reduceF(acc, cur.value, f); // Symbol['nop'] 처리.
+      if(acc instanceof Promise){
+        return acc.then(recur);
+      }
+    }
+    return acc; // 누적된 결과값을 리턴
+  });
+
+  // # 누적(비동기 상황을 고려한 코드)
+  // return go1(acc, function recur(acc){
+  //   let cur;
+  //   while(!(cur = iter.next()).done){
+  //     const a = cur.value;
+  //     acc = f(acc, a); // 누적값을 함수에게 위임.
+  //     // 비동기일 경우 처리 후 재귀
+  //     if(acc instanceof Promise){
+  //       return acc.then(recur);
+  //     }
+  //   }
+  //   return acc; // 누적된 결과값을 리턴
+  // });
+
+  // # 누적(비동기 상황을 고려 안한 코드)
+  // let cur;
+  // while(!(cur = iter.next()).done){
+  //   const a = cur.value;
+  //   acc = f(acc, a); // 누적값을 함수에게 위임.
+  // }
+  // return acc; // 누적된 결과값을 리턴
 });
 
 
@@ -82,13 +126,30 @@ const range = l => {
 const take = curry((l, iter) => {
   let res = [];
   iter = iter[Symbol.iterator]();
-  let cur;
-  while (!(cur = iter.next()).done) {
-    const a = cur.value
-    res.push(a);
-    if(res.length === l){return res;}
-  }
-  return res;
+  // # Promise 처리 적용 전 코드
+  // let cur;
+  // while (!(cur = iter.next()).done) {
+  //   const a = cur.value;
+  //   res.push(a);
+  //   if(res.length === l){ return res; }
+  // }
+  // return res;
+
+  // # Promise 처리 적용
+  return function recur(){
+    let cur;
+    while (!(cur = iter.next()).done) {
+      const a = cur.value;
+      if(a instanceof Promise){ // Promise일 경우 처리
+        return a
+        .then(a => (res.push(a), res).length === l ? res: recur())
+        .catch(e => e === nop ? recur() : Promise.reject(e)); // catch 가 아무것도 하지 않기 위한 nop symbol이면 다시 recur() 실행.
+      }
+      res.push(a);
+      if(res.length === l){ return res; }
+    }
+    return res;
+  }();
 });
 
 
@@ -141,7 +202,7 @@ L.range = function *(l) {
  ======================================= */
 L.map = curry(function *(f, iter) {
   for(const a of iter){
-    yield f(a)
+    yield go1(a, f);
   }
 });
 
@@ -157,14 +218,34 @@ L.map = curry(function *(f, iter) {
 
 
 /** =======================================
+ *   nop
+ * . reject 시 다음 함수합성에 아무것도 값을 전달하지 않기 위한
+ * reject인지 에러로 인한 reject인지 구분하기 위한 심볼
+ ======================================= */
+const nop = Symbol('nop');
+
+
+/** =======================================
  *  L.filter
  ======================================= */
-// # iterable 적용
+// # Kleisli Composition 적용
 L.filter = curry(function *(f, iter){
   for( const a of iter){
-    if(f(a)) { yield a; }
+    const b = go1(a, f);
+    if ( b instanceof Promise) { // 비동기 처리.
+      // reject을 하면 다음에 함수가 대기를 해도 들어가지 않게 된다.
+      yield b.then(b => b ? a : Promise.reject(nop));
+    } else if(b) { // 동기 처리
+      yield a;
+    }
   }
 });
+// # 단순화
+// L.filter = curry(function *(f, iter){
+//   for( const a of iter){
+//     if(f(a)) { yield a; }
+//   }
+// });
 // # iterable 적용
 // L.filter = curry(function *(f, iter){
 //   iter = iter[Symbol.iterator]();
