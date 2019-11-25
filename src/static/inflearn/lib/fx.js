@@ -1,4 +1,5 @@
 const  {log, clear} = console;
+const C = {}; // 병렬 실행
 
 // ===== curry 정의
 const curry = f =>
@@ -87,15 +88,6 @@ const sum = curry((f, iter) => go(
   iter,
   map(f),
   reduce(add)));
-
-
-
-
-
-
-
-
-
 
 
 
@@ -403,3 +395,58 @@ L.flatMap = curry(pipe(L.map, L.flatten));
 
 // ===== 전체 평가
 const flatMap = pipe(L.map, flatten);
+
+
+
+/** =======================================
+ * 지연된 함수열의 병렬적으로 평가하기
+ * . C.reduce, C.take
+ * . Promise는 미리 catch를 처리 해 놓으면 error를 뿜지 않는다. 대신 명시적으로 catch를 달면 잘 작동된다.
+ *   - var a = Promise.reject('hi);
+ *     a.catch(a => a); // 에러를 뿜지 않는다.
+ *     a.catch(a => log(a, 'c')); // 나중에 catch 할 수 있다.
+======================================= */
+// ===== 아무것도 처리하지 않는 함수
+function noop() { }
+// ===== Promise일 경우 미리 먼저 catch를 해주고 아닐경우 아무것도 안한뒤 리턴한다.
+const catchNoop = arr =>
+  (arr.forEach(a => a instanceof Promise ? a.catch(noop) : a), arr);
+// # 코드 정리
+C.reduce = curry((f, acc, iter) => iter ?
+  reduce(f, acc, catchNoop([...iter])) :
+  reduce(f, catchNoop([...acc])));
+// # symbol['nop'] 처리
+// C.reduce = curry((f, acc, iter) => {
+//   // 동시 평가.
+//   const iter2 = catchNoop(iter ? [...iter] : [...acc]);
+//   return iter ?
+//     reduce(f, acc, iter2) :
+//     reduce(f, iter2)
+// });
+// # 비동기가 일어나는 것을 기다리지 않고 동시 실행
+// C.reduce = curry((f, acc, iter) => iter ?
+//   reduce(f, acc, [...iter]) :
+//   reduce(f, [...acc]));
+
+
+
+/** =======================================
+ * C.take
+ * . 병렬적 동시 실행 후 지정된 수량만 가져오기.
+======================================= */
+C.take = curry((l, iter) => take(l, catchNoop([...iter])));
+C.takeAll = C.take(Infinity);
+
+
+
+/** =======================================
+ * C.map
+======================================= */
+C.map = curry(pipe(L.map, C.takeAll));
+
+
+
+/** =======================================
+ * C.filter
+======================================= */
+C.filter = curry(pipe(L.filter, C.takeAll));
